@@ -1,0 +1,13 @@
+{
+  "httpd": {
+    "port": 80
+  },
+  "run_list": [
+    "recipe[yum-epel]",
+    "recipe[base_packages]",
+    "recipe[httpd]"
+  ],
+  "automatic": {
+    "ipaddress": "webdb"
+  }
+}

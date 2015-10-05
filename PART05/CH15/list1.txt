@@ -1,0 +1,21 @@
+server {
+    listen 80;
+    server_name example1.jp;
+    location / {
+        proxy_pass http://192.168.0.101;
+    }
+}
+server {
+    listen 80;
+    server_name example2.jp;
+    location / {
+        proxy_pass http://192.168.0.102;
+    }
+}
+server {
+    listen 80;
+    server_name example3.jp;
+    location / {
+        proxy_pass http://192.168.0.103;
+    }
+}

@@ -1,0 +1,22 @@
+#!/bin/bash
+echo "Post receive hook"
+export REPO_DIR=/var/tmp/site/
+while read oldrev newrev refname
+do
+    echo args: $oldrev $newrev $refname
+    branch=`echo $refname | cut -d/ -f3`
+    if [ "master" == "$branch" ]; then
+        cd $REPO_DIR
+	echo $GIT_DIR
+	unset GIT_DIR
+	git pull
+        docker build -t sample-app .
+        docker tag sample-app localhost:5000/sample-app:$newrev
+        docker tag sample-app localhost:5000/sample-app:latest
+        docker push localhost:5000/sample-app
+        ruby start_www.rb localhost:5000/sample-app:$newrev > haproxy_$newrev.cfg
+        ln -sf haproxy_$newrev.cfg haproxy_latest.cfg
+        sudo /etc/init.d/haproxy reload
+    fi
+done
+

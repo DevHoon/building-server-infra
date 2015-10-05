@@ -1,0 +1,48 @@
+{
+  "builders": [{
+    "type": "amazon-ebs",
+    "access_key": "xxx",
+    "secret_key": "xxxxxx",
+    "region": "ap-northeast-1",
+    "source_ami": "ami-9fbec39e",
+    "instance_type": "t1.micro",
+    "ssh_username": "ec2-user",
+    "ssh_timeout": "15m",
+    "ami_name": "packer-quick-start_v6",
+    "launch_block_device_mappings": [{
+      "device_name": "/dev/sda1",
+      "volume_size": 10,
+      "delete_on_termination": true
+    }],
+    "ami_block_device_mappings": [{
+      "device_name": "/dev/sdb",
+      "virtual_name": "ephemeral0"
+    }],
+    "tags": {
+      "OS_Version": "Amazon Linux",
+      "Release": "Latest"
+    }
+  }],
+  "provisioners": [{
+    "type": "file",
+    "source": "app.tar.gz",
+    "destination": "/tmp/app.tar.gz"
+  },
+  {
+    "type": "shell",
+    "inline": [
+      "sudo yum -y update",
+      "sudo yum -y install ruby",
+      "sudo gem install bundler",
+      "sudo mkdir /src",
+      "sudo tar -C/src -xzf /tmp/app.tar.gz",
+      "sudo chown -R ec2-user:ec2-user /src",
+      "cd /src/site && bundler install",
+      "sudo sed -i 's/Defaults/# Defaults/' /etc/sudoers",
+      "sudo chmod 777 /etc/rc.local",
+      "echo 'cd /src/site && sudo -u ec2-user /home/ec2-user/bin/rackup -p4567 &' >> /etc/rc.local"
+    ]
+  }]
+}
+
+	    

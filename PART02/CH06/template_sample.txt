@@ -1,0 +1,738 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Multi AZ Wordpress Deplpyment",
+  "Mappings": {
+    "AWSRegion2AMI": {
+      "ap-northeast-1": {
+        "AMI": "ami-29dc9228"
+      },
+      "ap-southeast-1": {
+        "AMI": "ami-a6b6eaf4"
+      },
+      "ap-southeast-2": {
+        "AMI": "ami-d9fe9be3"
+      },
+      "eu-west-1": {
+        "AMI": "ami-892fe1fe"
+      },
+      "sa-east-1": {
+        "AMI": "ami-c9e649d4"
+      },
+      "us-east-1": {
+        "AMI": "ami-76817c1e"
+      },
+      "us-west-1": {
+        "AMI": "ami-f0d3d4b5"
+      },
+      "us-west-2": {
+        "AMI": "ami-d13845e1"
+      }
+    }
+  },
+  "Parameters": {
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Type": "String"
+    },
+    "InstanceType": {
+      "Description": "WebServer EC2 instance type",
+      "Type": "String",
+      "Default": "t2.micro",
+      "AllowedValues": [
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "c3.large",
+        "c3.xlarge",
+        "c3.2xlarge",
+        "c3.4xlarge",
+        "c3.8xlarge"
+      ],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "AvailabilityZone1": {
+      "Description": "One of two Availability Zones to use",
+      "Type": "String",
+      "Default": "a"
+    },
+    "AvailabilityZone2": {
+      "Description": "Another Availability Zones to use",
+      "Type": "String",
+      "Default": "c"
+    },
+    "MinNumberOfInstances": {
+      "Description": "Minimum size of Web Server Auto Scaling Group",
+      "Type": "Number",
+      "Default": "1"
+    },
+    "MaxNumberOfInstances": {
+      "Description": "Maximum size of Web Server Auto Scaling Group",
+      "Type": "Number",
+      "Default": "4"
+    },
+    "DBClass": {
+      "Default": "db.t1.micro",
+      "Description": "Database instance class",
+      "Type": "String",
+      "AllowedValues": [
+        "db.t1.micro",
+        "db.m1.small",
+        "db.m3.medium",
+        "db.m3.large",
+        "db.r3.large",
+        "db.r3.xlarge",
+        "db.r3.2xlarge",
+        "db.r3.4xlarge",
+        "db.r3.8xlarge"
+      ],
+      "ConstraintDescription": "must select a valid database instance type."
+    },
+    "DBName": {
+      "Default": "wordpress",
+      "Description": "The WordPress database name",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+    },
+    "DBUsername": {
+      "Default": "admin",
+      "NoEcho": "true",
+      "Description": "The WordPress database admin account username",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "16",
+      "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+    },
+    "DBPassword": {
+      "Default": "password",
+      "NoEcho": "true",
+      "Description": "The WordPress database admin account password",
+      "Type": "String",
+      "MinLength": "8",
+      "MaxLength": "41",
+      "AllowedPattern": "[a-zA-Z0-9]*",
+      "ConstraintDescription": "must contain only alphanumeric characters."
+    },
+    "MultiAZDatabase": {
+      "Default": "false",
+      "Description": "Create a multi-AZ MySQL Amazon RDS database instance",
+      "Type": "String",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "ConstraintDescription": "must be either true or false."
+    },
+    "DBAllocatedStorage": {
+      "Default": "5",
+      "Description": "The size of the database (Gb)",
+      "Type": "Number",
+      "MinValue": "5",
+      "MaxValue": "1024",
+      "ConstraintDescription": "must be between 5 and 1024Gb."
+    }
+  },
+  "Resources": {
+    "vpc1e0d9476": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "InstanceTenancy": "default"
+      }
+    },
+    "subneta8049dc0": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.11.0/24",
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              {
+                "Ref": "AvailabilityZone1"
+              }
+            ]
+          ]
+        },
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "subneteb0d9483": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.2.0/24",
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              {
+                "Ref": "AvailabilityZone2"
+              }
+            ]
+          ]
+        },
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "subnet87049def": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.12.0/24",
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              {
+                "Ref": "AvailabilityZone1"
+              }
+            ]
+          ]
+        },
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "subnet160d947e": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/24",
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              {
+                "Ref": "AvailabilityZone2"
+              }
+            ]
+          ]
+        },
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "igw1f0d9477": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {}
+    },
+    "dopt0016b968": {
+      "Type": "AWS::EC2::DHCPOptions",
+      "Properties": {
+        "DomainNameServers": [
+          "AmazonProvidedDNS"
+        ]
+      }
+    },
+    "acl110d9479": {
+      "Type": "AWS::EC2::NetworkAcl",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "rtb150d947d": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "rtb0f254467": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        }
+      }
+    },
+    "elbWordPressLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "Subnets": [
+          {
+            "Ref": "subnet160d947e"
+          },
+          {
+            "Ref": "subneta8049dc0"
+          }
+        ],
+        "HealthCheck": {
+          "HealthyThreshold": "10",
+          "Interval": "30",
+          "Target": "HTTP:80/wp-admin/install.php",
+          "Timeout": "5",
+          "UnhealthyThreshold": "2"
+        },
+        "Listeners": [
+          {
+            "InstancePort": "80",
+            "LoadBalancerPort": "80",
+            "Protocol": "HTTP",
+            "InstanceProtocol": "HTTP"
+          }
+        ],
+        "SecurityGroups": [
+          {
+            "Ref": "sgelbsg"
+          }
+        ]
+      }
+    },
+    "asggroup1": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "AWS::Region"
+                },
+                {
+                  "Ref": "AvailabilityZone1"
+                }
+              ]
+            ]
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "AWS::Region"
+                },
+                {
+                  "Ref": "AvailabilityZone2"
+                }
+              ]
+            ]
+          }
+        ],
+        "Cooldown": "300",
+        "DesiredCapacity": "1",
+        "MaxSize": {
+          "Ref": "MaxNumberOfInstances"
+        },
+        "MinSize": {
+          "Ref": "MinNumberOfInstances"
+        },
+        "HealthCheckGracePeriod": "0",
+        "HealthCheckType": "EC2",
+        "VPCZoneIdentifier": [
+          {
+            "Ref": "subnet160d947e"
+          },
+          {
+            "Ref": "subneta8049dc0"
+          }
+        ],
+        "LaunchConfigurationName": {
+          "Ref": "lcconfig1"
+        },
+        "LoadBalancerNames": [
+          {
+            "Ref": "elbWordPressLoadBalancer"
+          }
+        ],
+        "Tags": []
+      }
+    },
+    "rdswordpressdb": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": {
+        "AllocatedStorage": {
+          "Ref": "DBAllocatedStorage"
+        },
+        "AutoMinorVersionUpgrade": "true",
+        "BackupRetentionPeriod": "1",
+        "DBInstanceClass": {
+          "Ref": "DBClass"
+        },
+        "DBName": {
+          "Ref": "DBName"
+        },
+        "Engine": "mysql",
+        "EngineVersion": "5.5.8",
+        "LicenseModel": "general-public-license",
+        "MasterUsername": {
+          "Ref": "DBUsername"
+        },
+        "MasterUserPassword": {
+          "Ref": "DBPassword"
+        },
+        "MultiAZ": {
+          "Ref": "MultiAZDatabase"
+        },
+        "Port": "3306",
+        "PreferredBackupWindow": "17:00-17:30",
+        "PreferredMaintenanceWindow": "mon:18:00-mon:18:30",
+        "VPCSecurityGroups": [
+          {
+            "Ref": "sgwebsg"
+          }
+        ],
+        "DBSubnetGroupName": {
+          "Ref": "dbsubnetwordpressdbsubnetgroup"
+        }
+      }
+    },
+    "lcconfig1": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "ImageId": {
+          Region2
+        },
+        "AssociatePublicIpAddress": true,
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "InstanceMonitoring": "true",
+        "SecurityGroups": [
+          {
+            "Ref": "sgwebsg"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash\n",
+                "yum update -y aws-cfn-bootstrap\n",
+                "/opt/aws/bin/cfn-init -s ",
+                {
+                  "Ref": "AWS::StackId"
+                },
+                " -r lcconfig1 ",
+                " --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n",
+                "# Install chef-solo\n",
+                "curl -L https://www.opscode.com/chef/install.sh | bash \n",
+                "# Fetch WordPress cookbook\n",
+                "chef-solo -r http://web-db-press.s3.amazonaws.com/WebDBPress/downloads/chef-wordpress.tgz \n",
+                "# Run chef-solo\n",
+                "chef-solo -o wordpress::default -j /var/chef/node.json \n"
+              ]
+            ]
+          }
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "files": {
+              "/var/chef/node.json": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "{",
+                      "\"wordpress\": {",
+                      " \"db\": {",
+                      " \"host\": \"",
+                      {
+                        "Fn::GetAtt": [
+                          "rdswordpressdb",
+                          "Endpoint.Address"
+                        ]
+                      },
+                      "\",",
+                      " \"database\": \"",
+                      {
+                        "Ref": "DBName"
+                      },
+                      "\",",
+                      " \"user\": \"",
+                      {
+                        "Ref": "DBUsername"
+                      },
+                      "\",",
+                      " \"password\": \"",
+                      {
+                        "Ref": "DBPassword"
+                      },
+                      "\"",
+                      "}}}"
+                    ]
+                  ]
+                },
+                "mode": "000644",
+                "owner": "root",
+                "group": "root"
+              }
+            }
+          }
+        }
+      }
+    },
+    "dbsubnetwordpressdbsubnetgroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "WebDB Press",
+        "SubnetIds": [
+          {
+            "Ref": "subneteb0d9483"
+          },
+          {
+            "Ref": "subnet87049def"
+          }
+        ]
+      }
+    },
+    "sgwebsg": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "SG for Web Server",
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3306",
+            "ToPort": "3306",
+            "CidrIp": "10.0.0.0/16"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "sgelbsg": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "SG for ELB",
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "acl5": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "CidrBlock": "0.0.0.0/0",
+        "Egress": true,
+        "Protocol": "-1",
+        "RuleAction": "allow",
+        "RuleNumber": "100",
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        }
+      }
+    },
+    "acl6": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "CidrBlock": "0.0.0.0/0",
+        "Protocol": "-1",
+        "RuleAction": "allow",
+        "RuleNumber": "100",
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        }
+      }
+    },
+    "subnetacl9": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        },
+        "SubnetId": {
+          "Ref": "subnet87049def"
+        }
+      }
+    },
+    "subnetacl10": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        },
+        "SubnetId": {
+          "Ref": "subneteb0d9483"
+        }
+      }
+    },
+    "subnetacl11": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        },
+        "SubnetId": {
+          "Ref": "subnet160d947e"
+        }
+      }
+    },
+    "subnetacl12": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "acl110d9479"
+        },
+        "SubnetId": {
+          "Ref": "subneta8049dc0"
+        }
+      }
+    },
+    "gw3": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        },
+        "InternetGatewayId": {
+          "Ref": "igw1f0d9477"
+        }
+      }
+    },
+    "subnetroute11": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "rtb150d947d"
+        },
+        "SubnetId": {
+          "Ref": "subneta8049dc0"
+        }
+      }
+    },
+    "subnetroute12": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "rtb150d947d"
+        },
+        "SubnetId": {
+          "Ref": "subnet160d947e"
+        }
+      }
+    },
+    "subnetroute13": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "rtb0f254467"
+        },
+        "SubnetId": {
+          "Ref": "subnet87049def"
+        }
+      }
+    },
+    "subnetroute14": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "rtb0f254467"
+        },
+        "SubnetId": {
+          "Ref": "subneteb0d9483"
+        }
+      }
+    },
+    "route8": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "RouteTableId": {
+          "Ref": "rtb150d947d"
+        },
+        "GatewayId": {
+          "Ref": "igw1f0d9477"
+        }
+      },
+      "DependsOn": "gw3"
+    },
+    "dchpassoc3": {
+      "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc1e0d9476"
+        },
+        "DhcpOptionsId": {
+          "Ref": "dopt0016b968"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "WebsiteURL": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "http://",
+            {
+              "Fn::GetAtt": [
+                "elbWordPressLoadBalancer",
+                "DNSName"
+              ]
+            },
+            "/"
+          ]
+        ]
+      },
+      "Description": "WordPress Website"
+    }
+  }
+}
